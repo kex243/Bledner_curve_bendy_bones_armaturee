@@ -1,0 +1,192 @@
+import bpy
+#
+
+Name_of_collection_for_lokon= "lokon6642"
+number_of_point_in_curve = 0
+profile = Name_of_collection_for_lokon +" profile"
+#count number of points up to 8 max
+def check_points():
+    bpy.ops.object.editmode_toggle()
+    global number_of_point_in_curve
+    for i in range (99):
+        try:
+            bpy.context.object.data.splines[0].points[i].radius = bpy.context.object.data.splines[0].points[i].radius
+            number_of_point_in_curve=i+1
+        except:
+            bpy.ops.object.editmode_toggle()
+            return False
+
+
+check_points()
+
+
+def select_object(name):   
+    ob = bpy.context.scene.objects[name]       # Get the object
+    bpy.ops.object.select_all(action='DESELECT') # Deselect all objects
+    bpy.context.view_layer.objects.active = ob   # Make the cube the active object 
+    ob.select_set(True)                          # Select the cube
+#init collections
+def create_collection(name):
+    collection=bpy.data.collections.new(name)
+    bpy.context.scene.collection.children.link(collection)
+if Name_of_collection_for_lokon not in bpy.data.collections:
+    create_collection(Name_of_collection_for_lokon)
+
+def rename_and_assign_collections(name,new_name,collection):
+    select_object(name) 
+    obj=bpy.context.active_object
+    bpy.ops.collection.objects_remove_all()
+    bpy.data.collections[collection].objects.link(obj)
+    obj.name = new_name
+
+
+bpy.ops.object.editmode_toggle()
+#,aking curve 3d and nurbs and with end points and not bezier
+bpy.ops.curve.select_all(action='SELECT')
+bpy.ops.curve.spline_type_set(type='NURBS')
+bpy.context.object.data.dimensions = '3D'
+bpy.context.object.data.splines[0].use_endpoint_u = True
+bpy.context.object.data.splines[0].use_bezier_u = False
+bpy.context.object.data.splines[0].resolution_u = 8
+bpy.context.object.data.splines[0].order_u = 6
+
+
+
+bpy.ops.object.editmode_toggle()
+
+
+#seeting parnt curve
+curve=bpy.context.active_object
+curve_name=curve.name
+bpy.ops.object.shade_smooth()
+
+#hooks
+###
+
+bpy.ops.object.editmode_toggle()
+def create_control_points(i):
+    for z in range (1,i+1):
+        bpy.ops.curve.select_all(action='SELECT')
+        bpy.ops.curve.select_nth(skip=i, nth=0, offset=z)
+        bpy.ops.object.hook_add_newob()
+###        
+
+create_control_points(number_of_point_in_curve)
+bpy.ops.object.editmode_toggle()
+###
+
+bpy.ops.object.armature_add(enter_editmode=False, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+
+armature=bpy.context.active_object
+armature_name=armature.name
+
+###########
+bpy.ops.object.editmode_toggle()
+bpy.ops.armature.select_all(action='SELECT')
+bpy.ops.armature.subdivide(number_cuts=number_of_point_in_curve-2)
+bpy.context.object.show_in_front = True
+bpy.ops.object.editmode_toggle()
+###
+
+
+
+def select_bone(name):
+    #The desired Bone
+    bpy.ops.object.editmode_toggle()
+    
+    boneToSelect = bpy.data.objects[armature_name].pose.bones[name].bone # curve_namerelative, was 'Armature'
+    #Set as active 
+    bpy.context.object.data.bones.active = boneToSelect
+    #Select in viewport
+    boneToSelect.select = True
+    bpy.ops.object.editmode_toggle()
+    
+def apply_spring_bone(bone,bouncy,speed,gravity):
+    
+    bpy.ops.object.editmode_toggle()
+    select_bone (bone)
+    bpy.ops.object.posemode_toggle()
+    
+    bpy.context.active_pose_bone.sb_bone_rot = True
+    bpy.context.active_pose_bone.sb_bone_spring = True
+    bpy.context.active_pose_bone.sb_stiffness = bouncy
+    bpy.context.active_pose_bone.sb_damp = speed
+    bpy.context.active_pose_bone.sb_gravity = gravity
+
+    #
+    bpy.ops.object.posemode_toggle()
+#apply sprimg bone and resize
+for i in range (1,number_of_point_in_curve-1):  
+    bone_name= "Bone." + str(i).zfill(3)
+
+    apply_spring_bone(bone_name,0.1,0.5,0.75)
+
+######### applying bones to hooked empties
+# first bone #########  
+bpy.ops.object.editmode_toggle()
+bpy.ops.armature.select_all(action='DESELECT')
+select_bone ("Bone")
+empty = bpy.data.objects['Empty.'+str(number_of_point_in_curve-1).zfill(3)]
+bpy.context.active_bone.head[0]=empty.location[0]
+bpy.context.active_bone.head[1]=empty.location[1]
+bpy.context.active_bone.head[2]=empty.location[2]
+empty = bpy.data.objects['Empty.'+str(number_of_point_in_curve-2).zfill(3)]
+bpy.context.active_bone.tail[0]=empty.location[0]
+bpy.context.active_bone.tail[1]=empty.location[1]
+bpy.context.active_bone.tail[2]=empty.location[2]
+#head
+select_bone ("Bone.001")
+empty = bpy.data.objects['Empty']
+bpy.context.active_bone.tail[0]=empty.location[0]
+bpy.context.active_bone.tail[1]=empty.location[1]
+bpy.context.active_bone.tail[2]=empty.location[2]
+#rest
+for i in range(2,number_of_point_in_curve-1):
+    select_bone ("Bone."+str(i).zfill(3))
+    empty = bpy.data.objects['Empty.'+str(i-1).zfill(3)]
+    bpy.context.active_bone.tail[0]=empty.location[0]
+    bpy.context.active_bone.tail[1]=empty.location[1]
+    bpy.context.active_bone.tail[2]=empty.location[2]
+bpy.ops.object.editmode_toggle()
+'''bpy.ops.object.editmode_toggle()
+bpy.ops.object.posemode_toggle()
+bpy.ops.pose.constraint_add(type='SPLINE_IK')
+bpy.context.object.pose.bones["Bone.001"].constraints["Spline IK"].target = bpy.data.objects[curve_name]#along the curve ##correct edited from exact name
+bpy.context.object.pose.bones["Bone.001"].constraints["Spline IK"].chain_count = number_of_point_in_curve
+
+#
+bpy.ops.pose.armature_apply(selected=False)
+bpy.ops.constraint.delete(constraint="Spline IK", owner='BONE')
+
+bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
+bpy.ops.object.posemode_toggle()'''
+#
+def set_empty_to_bone(empty,bone):
+    
+    select_object(empty)    
+    
+    bpy.ops.object.constraint_add(type='CHILD_OF')
+    bpy.context.object.constraints["Child Of"].target = bpy.data.objects["Armature"]
+    bpy.context.object.constraints["Child Of"].subtarget = bone
+    bpy.ops.constraint.childof_set_inverse(constraint="Child Of", owner='OBJECT')
+    
+#first and last amd all in the middle
+
+set_empty_to_bone('Empty.'+str(number_of_point_in_curve-1).zfill(3),'Bone')
+set_empty_to_bone('Empty','Bone.001')
+for i in range(1,number_of_point_in_curve-1):
+    set_empty_to_bone('Empty.'+str(i).zfill(3),'Bone.'+str(i).zfill(3))
+    
+
+
+
+############
+
+
+for i in range(1,number_of_point_in_curve-1):
+    rename_and_assign_collections('Empty.'+str(i).zfill(3),'HairEmpty ' +Name_of_collection_for_lokon,Name_of_collection_for_lokon)  
+rename_and_assign_collections('Empty.'+str(number_of_point_in_curve-1).zfill(3),'HairEmpty ' +Name_of_collection_for_lokon,Name_of_collection_for_lokon)  
+rename_and_assign_collections('Empty','HairEmpty '+Name_of_collection_for_lokon,Name_of_collection_for_lokon)
+rename_and_assign_collections('Armature','HairArmature ' +Name_of_collection_for_lokon,Name_of_collection_for_lokon)
+rename_and_assign_collections('NurbsPath','Hair Curve '+Name_of_collection_for_lokon,Name_of_collection_for_lokon)
+#everything done, going to points
